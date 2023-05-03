@@ -10,6 +10,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
+const double EPSILION = 1e-6;
 
 string ReadLine() {
 	string s;
@@ -76,13 +77,12 @@ public:
 		documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status });
 	}
 	template <typename Predicate>
-	vector<Document> FindTopDocuments(const string& raw_query,
-		Predicate gived_function) const {
+	vector<Document> FindTopDocuments(const string& raw_query, Predicate predicate) const {
 		const Query query = ParseQuery(raw_query);
-		auto matched_documents = FindAllDocuments(query, gived_function);
-
-		sort(matched_documents.begin(), matched_documents.end(), [gived_function](const auto& lhs, const auto& rhs) {
-			if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+		auto matched_documents = FindAllDocuments(query, predicate);
+		
+		sort(matched_documents.begin(), matched_documents.end(), [predicate](const auto& lhs, const auto& rhs) {
+			if (abs(lhs.relevance - rhs.relevance) < EPSILION) {
 				return lhs.rating > rhs.rating;
 			}
 			else {
@@ -96,22 +96,7 @@ public:
 	}
 
 	vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus gived_status = DocumentStatus::ACTUAL) const {
-		const Query query = ParseQuery(raw_query);
-		auto matched_documents = FindAllDocuments(query, [gived_status](int document_id, DocumentStatus status, int rating) { return status == gived_status; });
-
-		sort(matched_documents.begin(), matched_documents.end(),
-			[](const Document& lhs, const Document& rhs) {
-				if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
-					return lhs.rating > rhs.rating;
-				}
-				else {
-					return lhs.relevance > rhs.relevance;
-				}
-			});
-		if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
-			matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
-		}
-		return matched_documents;
+		return FindTopDocuments(raw_query, [gived_status](int document_id, DocumentStatus status, int rating) { return status == gived_status; });
 	}
 
 	int GetDocumentCount() const {
@@ -220,16 +205,17 @@ private:
 		return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
 	}
 	template <typename Predicate>
-	vector<Document> FindAllDocuments(const Query& query, Predicate gived_function) const {
+	vector<Document> FindAllDocuments(const Query& query, Predicate predicate) const {
 		map<int, double> document_to_relevance;
 		for (const string& word : query.plus_words) {
 			if (word_to_document_freqs_.count(word) == 0) {
 				continue;
 			}
 			const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
-			for (const auto [document_id, term_freq] : word_to_document_freqs_.at(word)) {
+			for (const auto& [document_id, term_freq] : word_to_document_freqs_.at(word)) {
 				if (documents_.count(document_id) > 0) {
-					if (gived_function(document_id, documents_.at(document_id).status, documents_.at(document_id).rating)) {
+					const auto [rating, status] = documents_.at(document_id);
+					if (predicate(document_id, status, rating)) {
 						document_to_relevance[document_id] += term_freq * inverse_document_freq;
 					}
 				}
@@ -246,7 +232,7 @@ private:
 		}
 
 		vector<Document> matched_documents;
-		for (const auto [document_id, relevance] : document_to_relevance) {
+		for (const auto& [document_id, relevance] : document_to_relevance) {
 			matched_documents.push_back(
 				{ document_id, relevance, documents_.at(document_id).rating });
 		}
