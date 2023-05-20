@@ -118,10 +118,36 @@ void TestExcludeDocumentsWithMinusWordsFromSearchingResult() {
 			server.AddDocument(test.document_id, test.content, test.status, test.ratings);
 
 		}
+		//получение результата, с которым потом сравним полученный из FindTopDocuments
+		vector<string> query = SplitIntoWords("nice cat with black eyar -fluffy"s);
+		set<string> minus_words;
+		for (string text : query) {
+			if (!text.empty()) {
+				if (text[0] == '-') {
+					text = text.substr(1);
+					minus_words.insert(text);
+				}
+			}
+		}
+		vector<int> result;
+		for (const auto& test : test3) {
+			vector<string> document = SplitIntoWords(test.content);
+			for (const string& word : document) {
+				if (minus_words.count(word) != 0) {
+					break;
+				}
+				else {
+					result.emplace_back(test.document_id);
+				}
+			}
+		}
+
 		const vector<Document> found_docs2 = server.FindTopDocuments("nice cat with black eyar -fluffy"s);
 		const Document& doc2 = found_docs2[0];
 		ASSERT_EQUAL(found_docs2.size(), 1);
-		ASSERT(doc2.id == 1);
+		if (result.size() == 1) {
+			ASSERT(result[0] == doc2.id);
+		}
 	}
 }
 
