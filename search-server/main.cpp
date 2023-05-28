@@ -69,7 +69,7 @@ set<string> MakeUniqueNonEmptyStrings(const StringContainer& strings) {
 
 set<string> MakeUniqueNonEmptyStrings(const set<string>& strings) {
 	if (!strings.empty()) {
-	return strings;
+		return strings;
 	}
 	else {
 		throw invalid_argument("пусто"s);
@@ -113,9 +113,6 @@ public:
 	explicit SearchServer(const string& stop_words_text)
 		: SearchServer(SplitIntoWords(stop_words_text))  // Invoke delegating constructor from string container
 	{
-		if (!IsValidWord(stop_words_text)) {
-			throw invalid_argument("некорректный ввод string стоп-слов"s);
-		}
 	}
 
 	void AddDocument(int document_id, const string& document, DocumentStatus status,
@@ -140,8 +137,10 @@ public:
 
 	template <typename DocumentPredicate>
 	vector<Document> FindTopDocuments(const string& raw_query, DocumentPredicate document_predicate) const {
-		Query query;
-		CheckExceptions(raw_query, query);
+		Query query = ParseQuery(raw_query);
+		if (!IsValidWord(raw_query)) {
+			throw invalid_argument("в тексте запроса присутствуют спецсимволы"s);
+		}
 		vector<Document> matched_documents = FindAllDocuments(query, document_predicate);
 		sort(matched_documents.begin(), matched_documents.end(),
 			[](const Document& lhs, const Document& rhs) {
@@ -174,10 +173,11 @@ public:
 	}
 
 	tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
-		Query query;
-		CheckExceptions(raw_query, query);
+		Query query = ParseQuery(raw_query);
+		if (!IsValidWord(raw_query)) {
+			throw invalid_argument("в тексте запроса присутствуют спецсимволы"s);
+		}
 		vector<string> matched_words;
-		//tuple<vector<string>, DocumentStatus> matched_document;
 		for (const string& word : query.plus_words) {
 			if (word_to_document_freqs_.count(word) == 0) {
 				continue;
@@ -222,19 +222,11 @@ private:
 
 	//template <typename StringContainer>
 	static bool IsValidWord(const string& document) {
-		return none_of(document.begin(), document.end(), [](const auto c) {
-			return (c >= '\0') && (c < ' ');
-		});
-
+		return none_of(document.begin(), document.end(), [](const auto c) {return (c >= '\0') && (c < ' '); });
 	}
 
 	static bool IsValidWord(const set<string>& document) {
-		for (const string& doc : document) {
-			if (!IsValidWord(doc)) {
-				return false;
-			}
-		}
-		return true;
+		return all_of(document.begin(), document.end(), [](const string doc) {return IsValidWord(doc); });;
 	}
 
 	vector<string> SplitIntoWordsNoStop(const string& text) const {
@@ -266,17 +258,16 @@ private:
 
 	QueryWord ParseQueryWord(string text) const {
 		bool is_minus = false;
-		string empty_word = ""s;
 		// Word shouldn't be empty
-		if (text[1] == '-') {
-			return { empty_word, is_minus, false };
+		if ((text.size() > 1) && (text[1] == '-')) {
+			throw invalid_argument("некорретный ввод стоп-слов"s);
 		}
 		if (text[0] == '-') {
 			is_minus = true;
 			text = text.substr(1);
 		}
 		if (text.empty()) {
-			return { empty_word, is_minus, false };
+			return { text, is_minus, false };
 		}
 		return { text, is_minus, IsStopWord(text) };
 	}
@@ -286,20 +277,12 @@ private:
 		set<string> minus_words;
 	};
 
-	void CheckExceptions(const string& text, Query& query) const {
-		if (!IsValidWord(text)) {
-			throw invalid_argument("в тексте запроса присутствуют спецсимволы"s);
-		}
-		if (!ParseQuery(text, query)) {
-			throw invalid_argument("некорректный ввод минус-слов"s);
-		}
-	}
-
-	bool ParseQuery(const string& text, Query& query) const {
+	Query ParseQuery(const string& text) const {
+		Query query;
 		for (const string& word : SplitIntoWords(text)) {
 			const QueryWord query_word = ParseQueryWord(word);
 			if (query_word.data.empty()) {
-				return false;
+				throw invalid_argument("некорректный ввод минут слов"s);
 			}
 			if (!query_word.is_stop) {
 				if (query_word.is_minus) {
@@ -311,7 +294,7 @@ private:
 			}
 
 		}
-		return true;
+		return query;
 	}
 
 	// Existence required
