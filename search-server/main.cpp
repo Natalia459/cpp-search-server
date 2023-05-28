@@ -111,7 +111,7 @@ public:
 	}
 
 	explicit SearchServer(const string& stop_words_text)
-		: SearchServer(SplitIntoWords(stop_words_text))  // Invoke delegating constructor from string container
+		: SearchServer(SplitIntoWords(stop_words_text))  
 	{
 	}
 
@@ -195,7 +195,6 @@ public:
 				break;
 			}
 		}
-		//matched_document = { matched_words, documents_.at(document_id).status };
 		return { matched_words, documents_.at(document_id).status };
 
 	}
@@ -220,7 +219,6 @@ private:
 		return stop_words_.count(word) > 0;
 	}
 
-	//template <typename StringContainer>
 	static bool IsValidWord(const string& document) {
 		return none_of(document.begin(), document.end(), [](const auto c) {return (c >= '\0') && (c < ' '); });
 	}
@@ -258,7 +256,6 @@ private:
 
 	QueryWord ParseQueryWord(string text) const {
 		bool is_minus = false;
-		// Word shouldn't be empty
 		if ((text.size() > 1) && (text[1] == '-')) {
 			throw invalid_argument("некорретный ввод стоп-слов"s);
 		}
@@ -267,7 +264,7 @@ private:
 			text = text.substr(1);
 		}
 		if (text.empty()) {
-			return { text, is_minus, false };
+			throw invalid_argument("некорретный ввод стоп-слов"s);
 		}
 		return { text, is_minus, IsStopWord(text) };
 	}
@@ -281,9 +278,6 @@ private:
 		Query query;
 		for (const string& word : SplitIntoWords(text)) {
 			const QueryWord query_word = ParseQueryWord(word);
-			if (query_word.data.empty()) {
-				throw invalid_argument("некорректный ввод минут слов"s);
-			}
 			if (!query_word.is_stop) {
 				if (query_word.is_minus) {
 					query.minus_words.insert(query_word.data);
@@ -297,7 +291,6 @@ private:
 		return query;
 	}
 
-	// Existence required
 	double ComputeWordInverseDocumentFreq(const string& word) const {
 		return log(GetDocumentCount() * 1.0 / word_to_document_freqs_.at(word).size());
 	}
@@ -336,8 +329,6 @@ private:
 		return matched_documents;
 	}
 };
-
-// ==================== для примера =========================
 
 void PrintDocument(const Document& document) {
 	cout << "{ "s
