@@ -10,18 +10,24 @@ public:
 		:page_begin(range_begin), page_end(range_end)
 	{
 	}
+
 	Iterator begin() const {
 		return page_begin;
 	}
+
 	Iterator end() const {
 		return page_end;
 	}
+
 	size_t size() const {
 		return distance(page_begin, page_end);
 	}
+
 private:
-	Iterator page_begin, page_end;
+	Iterator page_begin;
+	Iterator page_end;
 };
+
 template <typename Iterator>
 class Paginator {
 public:
@@ -34,15 +40,19 @@ public:
 		}
 		diapason.push_back(IteratorRange(it, range_end));
 	}
+
 	auto begin() const {
 		return diapason.begin();
 	}
+
 	auto end() const {
 		return diapason.end();
 	}
+
 private:
 	std::vector<IteratorRange<Iterator>> diapason;
 };
+
 template <typename Iterator>
 std::ostream& operator<<(std::ostream& output, IteratorRange<Iterator> page) {
 	if (page.size() != 0) {
@@ -52,6 +62,7 @@ std::ostream& operator<<(std::ostream& output, IteratorRange<Iterator> page) {
 	}
 	return output;
 }
+
 template <typename Container>
 auto Paginate(const Container& c, size_t page_size) {
 	return Paginator(c.begin(), c.end(), page_size);
