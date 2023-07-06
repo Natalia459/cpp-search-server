@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include <numeric>
 #include <cmath>
 #include <tuple>
 #include <map>
@@ -24,9 +25,9 @@ public:
 
 	explicit SearchServer(const std::string& stop_words_text);
 	
-	std::vector<int>::iterator begin();
+	std::set<int>::iterator begin();
 	
-	std::vector<int>::iterator end();
+	std::set<int>::iterator end();
 
 	void AddDocument(int, const std::string&, DocumentStatus, const std::vector<int>&);
 
@@ -43,8 +44,6 @@ public:
 	
 	const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
 
-	bool CheckForRemoveDocument(int);
-
 	void RemoveDocument(int document_id);
 
 private:
@@ -57,9 +56,9 @@ private:
 	const std::set<std::string> stop_words_;
 	std::map<std::string, std::map<int, double>> word_to_document_freqs_;
 	std::map<int, struct DocumentData> documents_;
-	std::vector<int> document_ids_;
-	std::map<int, std::set<std::string>> words_from_documents_;
 	std::map<std::string, double> empty_map = {};
+	//спасибо, я как-то не подумала, а тут множество гораздо уместнее вектора
+	std::set<int> document_ids_;
 
 	bool IsStopWord(const std::string&) const;
 

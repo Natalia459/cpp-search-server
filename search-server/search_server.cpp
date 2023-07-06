@@ -2,14 +2,14 @@
 
 SearchServer::SearchServer(const std::string& stop_words_text)
 	: SearchServer(
-		SplitIntoWords(stop_words_text))  // Invoke delegating constructor from string container
+		SplitIntoWords(stop_words_text))  
 {
 }
 
-std::vector<int>::iterator SearchServer::begin() {
+std::set<int>::iterator SearchServer::begin() {
 	return document_ids_.begin();
 }
-std::vector<int>::iterator SearchServer::end() {
+std::set<int>::iterator SearchServer::end() {
 	return document_ids_.end();
 }
 
@@ -30,9 +30,8 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
 	}
 
 	documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status, temp_words });
-	document_ids_.emplace_back(document_id);
+	document_ids_.emplace(document_id);
 }
-
 
 std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query, DocumentStatus status) const {
 	return FindTopDocuments(raw_query, [status](int document_id, DocumentStatus document_status, int rating)
@@ -82,26 +81,6 @@ const std::map<std::string, double>& SearchServer::GetWordFrequencies(int docume
 	return empty_map;
 }
 
-bool SearchServer::CheckForRemoveDocument(int document_id) {
-	using namespace std;
-	std::set<std::string> current_words;
-
-	for (const auto& [word, freq] : documents_.at(document_id).words_freq) {
-		current_words.insert(word);
-	}
-
-	for (auto& [id, words] : words_from_documents_) {
-		if (words == current_words) {
-			std::cout << "Found duplicate document id "s << document_id << endl;
-			return true;
-		}
-	}
-
-	words_from_documents_[document_id] = current_words;
-
-	return false;
-}
-
 void SearchServer::RemoveDocument(int document_id) {
 	for (auto& [word, _] : documents_.at(document_id).words_freq) {
 		std::map<int, double> id_freq = word_to_document_freqs_.at(word);
@@ -112,8 +91,7 @@ void SearchServer::RemoveDocument(int document_id) {
 	}
 
 	documents_.erase(document_id);
-	auto itera = find(document_ids_.begin(), document_ids_.end(), document_id);
-	document_ids_.erase(itera);
+	document_ids_.erase(document_id);
 }
 
 bool SearchServer::IsStopWord(const std::string& word) const {
@@ -147,11 +125,7 @@ int SearchServer::ComputeAverageRating(const std::vector<int>& ratings) {
 		return 0;
 	}
 
-	int rating_sum = 0;
-	for (const int rating : ratings) {
-		rating_sum += rating;
-	}
-	return rating_sum / static_cast<int>(ratings.size());
+	return accumulate(ratings.begin(), ratings.end(), 0) / static_cast<int>(ratings.size());
 }
 
 SearchServer::QueryWord SearchServer::ParseQueryWord(const std::string& text) const {
