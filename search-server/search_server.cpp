@@ -6,6 +6,13 @@ SearchServer::SearchServer(const std::string& stop_words_text)
 {
 }
 
+std::vector<int>::iterator SearchServer::begin() {
+	return document_ids_.begin();
+}
+std::vector<int>::iterator SearchServer::end() {
+	return document_ids_.end();
+}
+
 void SearchServer::AddDocument(int document_id, const std::string& document, DocumentStatus status,
 	const std::vector<int>& ratings) {
 	using namespace std;
@@ -13,20 +20,22 @@ void SearchServer::AddDocument(int document_id, const std::string& document, Doc
 	if ((document_id < 0) || (documents_.count(document_id) > 0)) {
 		throw std::invalid_argument("Invalid document_id"s);
 	}
-	const auto words = SplitIntoWordsNoStop(document);
+	const std::vector<std::string> words = SplitIntoWordsNoStop(document);
 
 	const double inv_word_count = 1.0 / words.size();
+	std::map<std::string, double> temp_words;
 	for (const std::string& word : words) {
 		word_to_document_freqs_[word][document_id] += inv_word_count;
+		temp_words[word] += inv_word_count;
 	}
 
-	documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status });
-	document_ids_.push_back(document_id);
+	documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status, temp_words });
+	document_ids_.emplace_back(document_id);
 }
 
 
 std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query, DocumentStatus status) const {
-	return FindTopDocuments(raw_query, [status](int document_id, DocumentStatus document_status, int rating) 
+	return FindTopDocuments(raw_query, [status](int document_id, DocumentStatus document_status, int rating)
 		{
 			return document_status == status;
 		});
@@ -40,13 +49,8 @@ int SearchServer::GetDocumentCount() const {
 	return static_cast<int>(documents_.size());
 }
 
-int SearchServer::GetDocumentId(int index) const {
-	return document_ids_.at(index);
-}
-
-std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string& raw_query,
-	int document_id) const {
-	const auto query = ParseQuery(raw_query);
+std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument(const std::string& raw_query, int document_id) const {
+	const SearchServer::Query query = ParseQuery(raw_query);
 
 	std::vector<std::string> matched_words;
 	for (const std::string& word : query.plus_words) {
@@ -54,7 +58,7 @@ std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument
 			continue;
 		}
 		if (word_to_document_freqs_.at(word).count(document_id)) {
-			matched_words.push_back(word);
+			matched_words.emplace_back(word);
 		}
 	}
 
@@ -68,6 +72,48 @@ std::tuple<std::vector<std::string>, DocumentStatus> SearchServer::MatchDocument
 		}
 	}
 	return { matched_words, documents_.at(document_id).status };
+}
+
+const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const {
+	if (documents_.count(document_id)) {
+		return documents_.at(document_id).words_freq;
+	}
+
+	return empty_map;
+}
+
+bool SearchServer::CheckForRemoveDocument(int document_id) {
+	using namespace std;
+	std::set<std::string> current_words;
+
+	for (const auto& [word, freq] : documents_.at(document_id).words_freq) {
+		current_words.insert(word);
+	}
+
+	for (auto& [id, words] : words_from_documents_) {
+		if (words == current_words) {
+			std::cout << "Found duplicate document id "s << document_id << endl;
+			return true;
+		}
+	}
+
+	words_from_documents_[document_id] = current_words;
+
+	return false;
+}
+
+void SearchServer::RemoveDocument(int document_id) {
+	for (auto& [word, _] : documents_.at(document_id).words_freq) {
+		std::map<int, double> id_freq = word_to_document_freqs_.at(word);
+		id_freq.erase(document_id);
+		if (id_freq.empty()) {
+			word_to_document_freqs_.erase(word);
+		}
+	}
+
+	documents_.erase(document_id);
+	auto itera = find(document_ids_.begin(), document_ids_.end(), document_id);
+	document_ids_.erase(itera);
 }
 
 bool SearchServer::IsStopWord(const std::string& word) const {
@@ -90,7 +136,7 @@ std::vector<std::string> SearchServer::SplitIntoWordsNoStop(const std::string& t
 			throw std::invalid_argument("Word "s + word + " is invalid"s);
 		}
 		if (!IsStopWord(word)) {
-			words.push_back(word);
+			words.emplace_back(word);
 		}
 	}
 	return words;

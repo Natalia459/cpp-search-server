@@ -4,6 +4,7 @@
 #include <deque>
 #include "search_server.h"
 #include "document.h"
+
 class RequestQueue {
 public:
 	explicit RequestQueue(const SearchServer&);

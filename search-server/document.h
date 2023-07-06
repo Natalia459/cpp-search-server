@@ -14,7 +14,7 @@ enum class DocumentStatus {
 	ACTUAL,
 	IRRELEVANT,
 	BANNED,
-	REMOVED,
+	REMOVED
 }; 
 
 std::ostream& operator<<(std::ostream&, Document);

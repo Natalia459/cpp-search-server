@@ -23,6 +23,10 @@ public:
 	SearchServer(const StringContainer& stop_words);
 
 	explicit SearchServer(const std::string& stop_words_text);
+	
+	std::vector<int>::iterator begin();
+	
+	std::vector<int>::iterator end();
 
 	void AddDocument(int, const std::string&, DocumentStatus, const std::vector<int>&);
 
@@ -35,20 +39,27 @@ public:
 
 	int GetDocumentCount() const;
 
-	int GetDocumentId(int) const;
-
 	std::tuple<std::vector<std::string>, DocumentStatus> MatchDocument(const std::string&, int) const;
+	
+	const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
+
+	bool CheckForRemoveDocument(int);
+
+	void RemoveDocument(int document_id);
 
 private:
 	struct DocumentData {
 		int rating;
 		DocumentStatus status;
+		std::map<std::string, double> words_freq;
 	};
 
 	const std::set<std::string> stop_words_;
 	std::map<std::string, std::map<int, double>> word_to_document_freqs_;
 	std::map<int, struct DocumentData> documents_;
 	std::vector<int> document_ids_;
+	std::map<int, std::set<std::string>> words_from_documents_;
+	std::map<std::string, double> empty_map = {};
 
 	bool IsStopWord(const std::string&) const;
 
@@ -91,9 +102,9 @@ SearchServer::SearchServer(const StringContainer& stop_words)
 
 template <typename DocumentPredicate>
 std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query, DocumentPredicate document_predicate) const {
-	const auto query = ParseQuery(raw_query);
+	const SearchServer::Query query = ParseQuery(raw_query);
 
-	auto matched_documents = FindAllDocuments(query, document_predicate);
+	std::vector<Document> matched_documents = FindAllDocuments(query, document_predicate);
 
 	sort(matched_documents.begin(), matched_documents.end(),
 		[](const Document& lhs, const Document& rhs) {
@@ -138,7 +149,7 @@ std::vector<Document> SearchServer::FindAllDocuments(const Query& query, Documen
 	}
 
 	std::vector<Document> matched_documents;
-	for (const auto [document_id, relevance] : document_to_relevance) {
+	for (const auto& [document_id, relevance] : document_to_relevance) {
 		matched_documents.push_back(
 			{ document_id, relevance, documents_.at(document_id).rating });
 	}
