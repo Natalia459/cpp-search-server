@@ -4,7 +4,6 @@
 #include <deque>
 #include "search_server.h"
 #include "document.h"
-
 class RequestQueue {
 public:
 	explicit RequestQueue(const SearchServer&);
@@ -34,7 +33,8 @@ private:
 };
 
 template <typename DocumentPredicate>
-std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) {
+std::vector<Document> RequestQueue::AddFindRequest(const std::string& raw_query, DocumentPredicate document_predicate) 
+{
 	std::vector<Document> result = search_server_.FindTopDocuments(raw_query, document_predicate);
 	CheckRequests(result.size());
 	return result;
